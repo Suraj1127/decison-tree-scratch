@@ -6,6 +6,8 @@ Date: 8th November, 2018
 Description: Implementation of decision trees from scratch
 """
 
+import pickle
+
 from collections import Counter
 
 import numpy as np
@@ -245,6 +247,14 @@ class DecisionTree:
         """
         self.model = self.train(self.train_x, self.train_y)
 
+    def save_model(self):
+        """
+        Saves the created model as pickle files.
+        """
+        with open('models/titanic.pickle', 'wb') as f:
+            model = {'model': self.model, 'columns': list(self.columns), 'indices': self.indices}
+            pickle.dump(model, f)
+
     def predict(self, input_data, model):
         """
         Predicts and returns the label.
@@ -306,6 +316,9 @@ def main():
     # create DecisionTree model and train using the loaded data
     dt = DecisionTree(data, categorical_columns=['Pclass', 'Sex', 'Embarked'])
     dt.build_model()
+
+    # save the model as pickle file
+    dt.save_model()
 
     # evaluate the model performance on 20% test data
     dt.evaluate()
