@@ -6,8 +6,6 @@ Date: 8th November, 2018
 Description: Implementation of decision trees from scratch
 """
 
-import pprint
-
 from collections import Counter
 
 import numpy as np
@@ -64,14 +62,16 @@ class DecisionTree:
         self.indices['categorical'] = [i for (i, j) in enumerate(self.columns) if j in categorical_columns]
         self.indices['numeric'] = list(set(range(no_of_features)) - set(self.indices['categorical']))
 
-    def _get_gini_impurity(self, sett):
+    @staticmethod
+    def _get_gini_impurity(sett):
         """
         Returns Gini impurity given the set of data(sett).
         Note: sett would not be exact set(containing unique values).
         """
         return GiniImpurity(sett).get_impurity()
 
-    def _get_column_data(self, x, categorical_index):
+    @staticmethod
+    def _get_column_data(x, categorical_index):
         """
         Sets data related to the specific column specified by categorical_index to the dictionary column_data and
         returns the dictionary.
@@ -102,8 +102,7 @@ class DecisionTree:
                 sub_labels = y[
                     x[:, categorical_index] == x_label
                     ]
-                impurity_t += self._get_gini_impurity(sub_labels) * \
-                              column_counter[x_label] / clean_column_series.shape[0]
+                impurity_t += self._get_gini_impurity(sub_labels) * column_counter[x_label] / clean_column_series.shape[0]
 
             if impurity_t < impurity:
                 impurity = impurity_t
@@ -141,7 +140,7 @@ class DecisionTree:
                     x[:, numeric_index] >= separator
                     ]
                 impurity_t = self._get_gini_impurity(sub_label_lesser) * sub_label_lesser.shape[0] / clean_column_series.shape[0] + \
-                self._get_gini_impurity(sub_label_greater) * sub_label_greater.shape[0] / clean_column_series.shape[0]
+                            self._get_gini_impurity(sub_label_greater) * sub_label_greater.shape[0] / clean_column_series.shape[0]
                 if impurity_t < impurity_individual:
                     impurity_individual = impurity_t
                     best_separator_individual = separator
