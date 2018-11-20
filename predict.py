@@ -35,6 +35,11 @@ def predict(input_data, model, columns, indices):
     if indicator[0] in [columns[i] for i in indices['categorical']]:
 
         # if the indicator is categorical just do dictionary lookup
+
+        # if the label we gave as input is not there in the model we created, take the 'default' value
+        if input_data[indicator[0]] not in model[indicator[0]].keys():
+            input_data[indicator[0]] = model[indicator[0]]['default']
+
         return predict(input_data, model[indicator[0]][input_data[indicator[0]]], columns, indices)
     else:
 

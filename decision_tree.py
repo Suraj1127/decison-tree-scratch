@@ -10,6 +10,8 @@ import pickle
 
 from collections import Counter
 
+from pprint import pprint
+
 import numpy as np
 import pandas as pd
 
@@ -20,7 +22,7 @@ from impurities import GiniImpurity
 
 class DecisionTree:
 
-    def __init__(self, data, categorical_columns):
+    def __init__(self, data, categorical_columns, type, max_bins):
 
         """
         Assumption:
@@ -29,6 +31,8 @@ class DecisionTree:
         Parameters:
         :param data: Whole data with labels in the first column.
         :param categorical_columns: Name of columns having categorical values.
+        :type: Type of the learning if it is regression or classification.
+        :max_bins: No of samples that can fit in a bin
         ________________________________________________________________________________________________________________
 
         Instance variables:
@@ -39,6 +43,9 @@ class DecisionTree:
         model: model for decision tree saved as dictionary
 
         """
+        self.type = type
+        self.max_bins = max_bins
+
         self.columns = data.columns[1:]
         data = data.values
 
@@ -155,6 +162,7 @@ class DecisionTree:
         return best_numeric_index, impurity, best_separator
 
     def train(self, x, y):
+
         """
         Given the labelled data with input x and output y, train the model recursively.
         ________________________________________________________________________________________________________________
@@ -169,11 +177,17 @@ class DecisionTree:
 
         """
 
-        if len(set(y)) == 1:
-            return y[0]
+        if self.type == 'regression':
+            pass
+        else:
+            if len(set(y)) == 1:
+                return y[0]
 
-        if len(self.indices['categorical']) == 0:
-            return Counter(y).most_common(1)[0][0]
+        if (len(self.indices['categorical']) == 0 and len(self.indices['numeric']) == 0) or (len(y) <= self.max_bins):
+            if self.type == 'classification':
+                return Counter(y).most_common(1)[0][0]
+            else:
+                return sum(y)/len(y)
 
         # Get best category index to do the comparison/split.
         best_category_index, categorical_impurity = self._get_best_category_index(x, y)
@@ -202,7 +216,7 @@ class DecisionTree:
 
             # using default key to account for missing values in input data to be predicted
             # the value having highest mode is taken as default value
-            model[self.columns[best_index]]['default'] = Counter(self.train_x[:, best_index]).most_common(1)[0][0]
+            model[self.columns[best_index]]['default'] = Counter(x[:, best_index]).most_common(1)[0][0]
 
             # Append the removed categorical index
             self.indices['categorical'].append(best_index)
@@ -220,12 +234,18 @@ class DecisionTree:
             # For greater than or equal to case
             train_x_t = x[column_series >= best_separator, :]
             train_y_t = y[column_series >= best_separator]
-            model[self.columns[best_index]]['>=' + str(best_separator)] = self.train(train_x_t, train_y_t)
+            if train_y_t.shape[0] == 0:
+                pass
+            else:
+                model[self.columns[best_index]]['>=' + str(best_separator)] = self.train(train_x_t, train_y_t)
 
             # For less than case
             train_x_t = x[column_series < best_separator, :]
             train_y_t = y[column_series < best_separator]
-            model[self.columns[best_index]]['< ' + str(best_separator)] = self.train(train_x_t, train_y_t)
+            if train_y_t.shape[0] == 0:
+                pass
+            else:
+                model[self.columns[best_index]]['< ' + str(best_separator)] = self.train(train_x_t, train_y_t)
 
             # using default key to account for missing values in input data to be predicted
             # the value having highest mode is taken as default value
@@ -274,6 +294,11 @@ class DecisionTree:
         if indicator[0] in [self.columns[i] for i in self.indices['categorical']]:
 
             # if the indicator is categorical just do dictionary lookup
+
+            # if the label we gave as input is not there in the model we created, take the 'default' value
+            if input_data[indicator[0]] not in model[indicator[0]].keys():
+                input_data[indicator[0]] = model[indicator[0]]['default']
+
             return self.predict(input_data, model[indicator[0]][input_data[indicator[0]]])
         else:
 
@@ -305,7 +330,27 @@ class DecisionTree:
 
         # predict the y values and save in an array
         y_pred = np.array([self.predict(i, self.model) for i in test_dict_list])
-        print('Accuracy on test data:', 100 * sum((y_pred == self.test_y)) / y_pred.shape[0])
+
+        # for titanic we should do classification.  Applying regression and then doing comparison
+        # for classification
+        if self.type == 'regression':
+            print('Accuracy on test data:', 100 * sum(((y_pred > 0.5) == self.test_y)) / y_pred.shape[0])
+        else:
+            print('Accuracy on test data:', 100 * sum((y_pred == self.test_y)) / y_pred.shape[0])
+
+        # create tuples of dictionaries from train data(which we splitted in constructor)
+        train_tuples = pd.DataFrame(self.train_x, columns=self.columns).T.to_dict().items()
+        train_dict_list = [j for (i, j) in train_tuples]
+
+        # predict the y values and save in an array
+        y_pred = np.array([self.predict(i, self.model) for i in train_dict_list])
+
+        # for titanic we should do classification.  Applying regression and then doing comparison
+        # for classification
+        if self.type == 'regression':
+            print('Accuracy on train data:', 100 * sum(((y_pred > 0.5) == self.train_y)) / y_pred.shape[0])
+        else:
+            print('Accuracy on train data:', 100 * sum((y_pred == self.train_y)) / y_pred.shape[0])
 
 
 def main():
@@ -314,7 +359,7 @@ def main():
     data = pd.read_csv('data/preprocessed/train.csv')
 
     # create DecisionTree model and train using the loaded data
-    dt = DecisionTree(data, categorical_columns=['Pclass', 'Sex', 'Embarked'])
+    dt = DecisionTree(data, categorical_columns=['Pclass', 'Sex', 'Embarked'], type='regression', max_bins=15)
     dt.build_model()
 
     # save the model as pickle file
